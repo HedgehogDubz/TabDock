@@ -2,12 +2,13 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QPushButton
 from UI._style_guide import bg, black
 
 class TabDock(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, create_external_docks=False):
         super().__init__(parent)
 
         self.tabIndex = 0
         self.tabs = []
         self.docks = []
+        
         self.tab_buttons = []
 
         self.main_layout = QVBoxLayout(self)
@@ -25,9 +26,12 @@ class TabDock(QWidget):
 
         self.tab_content_widget = QWidget()
         self.tab_content_widget.setStyleSheet(f"background-color: {bg};")
+        self.tab_content_widget.setAcceptDrops(True)
 
         self.main_layout.addWidget(self.tab_chooser_widget)
         self.main_layout.addWidget(self.tab_content_widget, 1)
+
+        self.create_external_docks = create_external_docks
 
     def add_tab(self, tab):
         index = len(self.tabs)
