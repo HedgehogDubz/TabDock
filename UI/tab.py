@@ -144,21 +144,40 @@ class Tab(QWidget):
                     neighbor.update_geometry()
 
             # Update connectors to replace dock with expanding neighbors
+            # Only update connectors that span the same dimension as the deleted dock
             for connector in connectors_to_update:
                 if isinstance(connector, HConnector):
-                    if dock in connector.left_docks:
-                        connector.left_docks.remove(dock)
-                        connector.left_docks.extend(expanding_neighbors)
-                    elif dock in connector.right_docks:
-                        connector.right_docks.remove(dock)
-                        connector.right_docks.extend(expanding_neighbors)
+                    # For HConnectors (vertical lines), check if connector spans the full width of the deleted dock
+                    # The connector should be at a position within the dock's horizontal range
+                    connector_in_dock_range = (dock.x_ratio <= connector.x_ratio <= (dock.x_ratio + dock.w_ratio))
+
+                    if connector_in_dock_range:
+                        # Only add neighbors that will span the same width as the deleted dock at this connector
+                        matching_neighbors = [n for n in expanding_neighbors
+                                             if (n.x_ratio <= connector.x_ratio <= (n.x_ratio + n.w_ratio))]
+
+                        if dock in connector.left_docks:
+                            connector.left_docks.remove(dock)
+                            connector.left_docks.extend(matching_neighbors)
+                        elif dock in connector.right_docks:
+                            connector.right_docks.remove(dock)
+                            connector.right_docks.extend(matching_neighbors)
                 elif isinstance(connector, VConnector):
-                    if dock in connector.top_docks:
-                        connector.top_docks.remove(dock)
-                        connector.top_docks.extend(expanding_neighbors)
-                    elif dock in connector.bottom_docks:
-                        connector.bottom_docks.remove(dock)
-                        connector.bottom_docks.extend(expanding_neighbors)
+                    # For VConnectors (horizontal lines), check if connector spans the full height of the deleted dock
+                    # The connector should be at a position within the dock's vertical range
+                    connector_in_dock_range = (dock.y_ratio <= connector.y_ratio <= (dock.y_ratio + dock.h_ratio))
+
+                    if connector_in_dock_range:
+                        # Only add neighbors that will span the same height as the deleted dock at this connector
+                        matching_neighbors = [n for n in expanding_neighbors
+                                             if (n.y_ratio <= connector.y_ratio <= (n.y_ratio + n.h_ratio))]
+
+                        if dock in connector.top_docks:
+                            connector.top_docks.remove(dock)
+                            connector.top_docks.extend(matching_neighbors)
+                        elif dock in connector.bottom_docks:
+                            connector.bottom_docks.remove(dock)
+                            connector.bottom_docks.extend(matching_neighbors)
 
         # Remove connectors on the expansion edge
         for connector in connectors_to_remove:
