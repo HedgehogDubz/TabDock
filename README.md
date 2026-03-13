@@ -208,7 +208,9 @@ Widget factory methods:
 | `add_text_input(placeholder, callback)` | Single-line text field |
 | `add_checkbox(text, callback)` | Checkbox |
 | `add_slider(minimum, maximum, value, callback)` | Horizontal slider |
+| `add_progress_bar(minimum, maximum, value)` | Progress bar |
 | `add_list(items, multi_select, callback)` | Scrollable list |
+| `add_calendar(callback)` | Monthly calendar picker |
 | `add_separator()` | Full-width horizontal divider line |
 | `add_spacer(height)` | Vertical blank space |
 | `next_row()` | Start a new row |
@@ -255,7 +257,9 @@ State key parameters by widget:
 | `add_text_input` | `string_key` | `str` |
 | `add_dropdown` | `string_key` | `str` (selected text) |
 | `add_slider` | `int_key` | `int` |
+| `add_progress_bar` | `int_key` | `int` |
 | `add_list` | `list_key` | `list[str]` |
+| `add_calendar` | `string_key` | `str` ("YYYY-MM-DD") |
 
 The `default` parameter sets the initial value only if the key has never been set. The first instance to initialize wins; subsequent instances pick up the current value.
 
