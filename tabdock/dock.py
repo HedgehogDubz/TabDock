@@ -1,12 +1,12 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QLabel, QApplication, QMenu
-from PyQt6.QtGui import QPainter, QColor, QPen, QCursor, QPixmap, QAction
+from PyQt6.QtGui import QPainter, QColor, QCursor, QAction
 from PyQt6.QtCore import Qt, QPoint
-from UI._style_guide import bg, black, border_color
+from tabdock._style_guide import bg, black, border_color
 import math
 
 class DragPreviewWidget(QWidget):
     """Floating widget that shows a preview of the tab being dragged"""
-    def __init__(self, text, size):
+    def __init__(self, text, size, bg_color, text_color):
         super().__init__()
         self.setWindowFlags(
             Qt.WindowType.ToolTip |
@@ -19,16 +19,18 @@ class DragPreviewWidget(QWidget):
         self.setFixedSize(size)
 
         self.button_text = text
+        self.bg_color = bg_color
+        self.text_color = text_color
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         painter.setOpacity(1.0)
-        painter.fillRect(self.rect(), QColor(bg))
+        painter.fillRect(self.rect(), QColor(self.bg_color))
 
         painter.setOpacity(1.0)
-        painter.setPen(QColor("white"))
+        painter.setPen(QColor(self.text_color))
         painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self.button_text)
 
 class DraggableTabButton(QPushButton):
@@ -63,7 +65,9 @@ class DraggableTabButton(QPushButton):
 
             self.dock._hide_dragged_tab(self.index)
 
-            self.drag_preview = DragPreviewWidget(self.text(), self.size())
+            self.drag_preview = DragPreviewWidget(self.text(), self.size(),
+                                                   self.dock.active_tab_color,
+                                                   self.dock.tab_text_color)
             self.drag_preview.show()
 
             self.grabMouse()
@@ -287,11 +291,43 @@ class Dock(QFrame):
     _drag_window_index = None
     _preview_dock = None
 
-    def __init__(self, parent, panels, x_ratio, y_ratio, w_ratio, h_ratio):
+    def __init__(self, parent, panels, x_ratio, y_ratio, w_ratio, h_ratio, *,
+                 dock_bg=None,
+                 tab_bar_bg=None,
+                 content_bg=None,
+                 dock_border_color=None,
+                 border_width=None,
+                 tab_text_color=None,
+                 active_tab_color=None,
+                 tab_height=None,
+                 tab_radius=None,
+                 tab_padding=None,
+                 tab_spacing=None,
+                 dock_padding=None,
+                 panel_bg=None,
+                 available_panels=None,
+                 accent_color=None):
         self.parent = parent
         super().__init__(parent.centralWidget())
 
-        self.setStyleSheet(f"background-color: {black}; margin: 0px;")
+        # Inherit from parent (Tab/TabDock) if not explicitly set
+        self.dock_bg           = dock_bg           if dock_bg           is not None else getattr(parent, 'dock_bg',           black)
+        self.tab_bar_bg        = tab_bar_bg        if tab_bar_bg        is not None else getattr(parent, 'tab_bar_bg',        black)
+        self.content_bg        = content_bg        if content_bg        is not None else getattr(parent, 'content_bg',        bg)
+        self.dock_border_color = dock_border_color if dock_border_color is not None else getattr(parent, 'dock_border_color', border_color)
+        self.border_width      = border_width      if border_width      is not None else getattr(parent, 'border_width',      2)
+        self.tab_text_color    = tab_text_color    if tab_text_color    is not None else getattr(parent, 'tab_text_color',    'white')
+        self.active_tab_color  = active_tab_color  if active_tab_color  is not None else getattr(parent, 'active_tab_color',  bg)
+        self.tab_height        = tab_height        if tab_height        is not None else getattr(parent, 'tab_height',        25)
+        self.tab_radius        = tab_radius        if tab_radius        is not None else getattr(parent, 'tab_radius',        5)
+        self.tab_padding       = tab_padding       if tab_padding       is not None else getattr(parent, 'tab_padding',       '5px 10px')
+        self.tab_spacing       = tab_spacing       if tab_spacing       is not None else getattr(parent, 'tab_spacing',       0)
+        self.dock_padding      = dock_padding      if dock_padding      is not None else getattr(parent, 'dock_padding',      2)
+        self.panel_bg          = panel_bg          if panel_bg          is not None else getattr(parent, 'panel_bg',          bg)
+        self.available_panels  = available_panels  if available_panels  is not None else getattr(parent, 'available_panels',  [])
+        self.accent_color      = accent_color      if accent_color      is not None else getattr(parent, 'accent_color',      '#5080c0')
+
+        self.setStyleSheet(f"background-color: {self.dock_bg}; margin: 0px;")
         self.setAcceptDrops(True)
         self.preview_button = None
         self.drop_insert_index = -1
@@ -317,24 +353,24 @@ class Dock(QFrame):
         self.tab_buttons = []
 
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(2, 2, 2, 2)
+        self.layout.setContentsMargins(self.dock_padding, self.dock_padding, self.dock_padding, self.dock_padding)
         self.layout.setSpacing(0)
 
         self.tab_bar_widget = QWidget()
-        self.tab_bar_widget.setStyleSheet(f"background-color: {black}; margin: 0px; padding: 0px; border: none;")
+        self.tab_bar_widget.setStyleSheet(f"background-color: {self.tab_bar_bg}; margin: 0px; padding: 0px; border: none;")
         self.tab_bar_widget.setContentsMargins(0, 0, 0, 0)
         self.tab_bar_widget.setAcceptDrops(False)
         self.tab_bar_widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
-        self.tab_bar_widget.setFixedHeight(25)
+        self.tab_bar_widget.setFixedHeight(self.tab_height)
 
         self.tab_bar = QHBoxLayout(self.tab_bar_widget)
         self.tab_bar.setContentsMargins(0, 0, 0, 0)
-        self.tab_bar.setSpacing(0)
+        self.tab_bar.setSpacing(self.tab_spacing)
         self.tab_bar.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
         # Create content area widget that always exists (even when no panels)
         self.content_widget = QWidget()
-        self.content_widget.setStyleSheet(f"background-color: {bg}; margin: 0px; padding: 0px; border: none;")
+        self.content_widget.setStyleSheet(f"background-color: {self.content_bg}; margin: 0px; padding: 0px; border: none;")
         self.content_widget.setContentsMargins(0, 0, 0, 0)
 
         self.content_layout = QVBoxLayout(self.content_widget)
@@ -344,7 +380,7 @@ class Dock(QFrame):
         for i, panel_class in enumerate(panels):
             tab_button = DraggableTabButton(panel_class.__name__, self, i)
             tab_button.setFlat(True)
-            tab_button.setStyleSheet(f"background-color: {black}; color: white; border: none; padding: 5px 10px; margin: 0px;")
+            tab_button.setStyleSheet(f"background-color: {self.tab_bar_bg}; color: {self.tab_text_color}; border: none; padding: {self.tab_padding}; margin: 0px;")
             tab_button.setContentsMargins(0, 0, 0, 0)
             tab_button.setAcceptDrops(False)
             tab_button.clicked.connect(lambda _, index=i: self.switch_tab(index))
@@ -389,59 +425,60 @@ class Dock(QFrame):
     def paintEvent(self, event):
         super().paintEvent(event)
 
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
-
-        pen = QPen(QColor(border_color))
-        pen.setWidth(2)
-        painter.setPen(pen)
-
-        painter.drawRect(1, 1, self.width() - 2, self.height() - 2)
-
     def contextMenuEvent(self, event):
         """Show context menu on right-click"""
         menu = QMenu(self)
 
-        # Style the menu for visibility
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #2b2b2b;
-                color: white;
-                border: 1px solid #555555;
-            }
-            QMenu::item {
+        # Style the menu using theme colors
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {self.dock_bg};
+                color: {self.tab_text_color};
+                border: 1px solid {self.dock_border_color};
+            }}
+            QMenu::item {{
                 padding: 5px 20px;
                 background-color: transparent;
-            }
-            QMenu::item:selected {
-                background-color: #3d3d3d;
-            }
+            }}
+            QMenu::item:selected {{
+                background-color: {self.tab_bar_bg};
+            }}
+            QMenu::item:disabled {{
+                color: {self.dock_border_color};
+            }}
         """)
 
         # Split dock submenu
         split_menu = menu.addMenu("Split Dock")
 
+        min_size = getattr(self.parent, 'min_dock_size', 100)
+        can_split_h = self.width()  >= min_size * 2
+        can_split_v = self.height() >= min_size * 2
+
         split_right_action = QAction("Split Right", self)
         split_right_action.triggered.connect(lambda: self.split_dock('right'))
+        split_right_action.setEnabled(can_split_h)
         split_menu.addAction(split_right_action)
 
         split_bottom_action = QAction("Split Bottom", self)
         split_bottom_action.triggered.connect(lambda: self.split_dock('bottom'))
+        split_bottom_action.setEnabled(can_split_v)
         split_menu.addAction(split_bottom_action)
 
         split_left_action = QAction("Split Left", self)
         split_left_action.triggered.connect(lambda: self.split_dock('left'))
+        split_left_action.setEnabled(can_split_h)
         split_menu.addAction(split_left_action)
 
         split_top_action = QAction("Split Top", self)
         split_top_action.triggered.connect(lambda: self.split_dock('top'))
+        split_top_action.setEnabled(can_split_v)
         split_menu.addAction(split_top_action)
 
         # Add panel submenu
         add_panel_menu = menu.addMenu("Add Panel")
 
-        # Get available panel classes
-        available_panels = self._get_available_panel_classes()
+        available_panels = self.available_panels
         for panel_class in available_panels:
             panel_action = QAction(panel_class.__name__, self)
             panel_action.triggered.connect(lambda checked, pc=panel_class: self.add_panel_from_class(pc))
@@ -455,32 +492,6 @@ class Dock(QFrame):
         menu.addAction(delete_action)
 
         menu.exec(event.globalPos())
-
-    def _get_available_panel_classes(self):
-        """Get all available panel classes from the project"""
-        from UI.panel import Panel
-        import inspect
-        import sys
-
-        # Collect all Panel subclasses
-        panel_classes = []
-
-        # Try to import known panel classes
-        try:
-            from UI.Docks.test_panel import TestPanel
-            panel_classes.append(TestPanel)
-        except ImportError:
-            pass
-
-        try:
-            from UI.Docks.test_panel2 import TestPanel2
-            panel_classes.append(TestPanel2)
-        except ImportError:
-            pass
-
-        # You can add more panel imports here as needed
-
-        return panel_classes
 
     def add_panel_from_class(self, panel_class):
         """Add a new panel instance to this dock"""
@@ -502,13 +513,34 @@ class Dock(QFrame):
         # Switch to the newly added panel
         self.switch_tab(len(self.panels) - 1)
 
+    def _visual_kwargs(self):
+        """Return visual style kwargs to propagate to child docks created by splitting."""
+        return dict(
+            dock_bg=self.dock_bg,
+            tab_bar_bg=self.tab_bar_bg,
+            content_bg=self.content_bg,
+            dock_border_color=self.dock_border_color,
+            border_width=self.border_width,
+            tab_text_color=self.tab_text_color,
+            active_tab_color=self.active_tab_color,
+            tab_height=self.tab_height,
+            tab_radius=self.tab_radius,
+            tab_padding=self.tab_padding,
+            tab_spacing=self.tab_spacing,
+            dock_padding=self.dock_padding,
+            panel_bg=self.panel_bg,
+            available_panels=self.available_panels,
+            accent_color=self.accent_color,
+        )
+
     def split_dock(self, direction):
         """Split this dock in the specified direction (left, right, top, bottom)"""
         if not hasattr(self.parent, 'add_dock') or not hasattr(self.parent, 'add_connector'):
             return
 
-        from UI.hconnector import HConnector
-        from UI.vconnector import VConnector
+        from tabdock.hconnector import HConnector
+        from tabdock.vconnector import VConnector
+        vkw = self._visual_kwargs()
 
         match direction:
             case 'left':
@@ -523,7 +555,7 @@ class Dock(QFrame):
                             conn.right_docks.remove(self)
 
                 # Create new dock on the left
-                new_dock = Dock(self.parent, [], self.x_ratio, self.y_ratio, new_w_ratio, self.h_ratio)
+                new_dock = Dock(self.parent, [], self.x_ratio, self.y_ratio, new_w_ratio, self.h_ratio, **vkw)
                 self.parent.add_dock(new_dock)
                 new_dock.show()
 
@@ -578,7 +610,7 @@ class Dock(QFrame):
                 self.update_geometry()
 
                 # Create new dock on the right
-                new_dock = Dock(self.parent, [], self.x_ratio + self.w_ratio, self.y_ratio, new_w_ratio, self.h_ratio)
+                new_dock = Dock(self.parent, [], self.x_ratio + self.w_ratio, self.y_ratio, new_w_ratio, self.h_ratio, **vkw)
                 self.parent.add_dock(new_dock)
                 new_dock.show()
 
@@ -624,7 +656,7 @@ class Dock(QFrame):
                             conn.bottom_docks.remove(self)
 
                 # Create new dock on top
-                new_dock = Dock(self.parent, [], self.x_ratio, self.y_ratio, self.w_ratio, new_h_ratio)
+                new_dock = Dock(self.parent, [], self.x_ratio, self.y_ratio, self.w_ratio, new_h_ratio, **vkw)
                 self.parent.add_dock(new_dock)
                 new_dock.show()
 
@@ -679,7 +711,7 @@ class Dock(QFrame):
                 self.update_geometry()
 
                 # Create new dock on the bottom
-                new_dock = Dock(self.parent, [], self.x_ratio, self.y_ratio + self.h_ratio, self.w_ratio, new_h_ratio)
+                new_dock = Dock(self.parent, [], self.x_ratio, self.y_ratio + self.h_ratio, self.w_ratio, new_h_ratio, **vkw)
                 self.parent.add_dock(new_dock)
                 new_dock.show()
 
@@ -730,9 +762,9 @@ class Dock(QFrame):
 
             for i, button in enumerate(self.tab_buttons):
                 if i == index:
-                    button.setStyleSheet(f"background-color: {bg}; color: white; border: none; padding: 5px 10px; margin: 0px; border-top-left-radius: 5px; border-top-right-radius: 5px;")
+                    button.setStyleSheet(f"background-color: {self.active_tab_color}; color: {self.tab_text_color}; border: none; padding: {self.tab_padding}; margin: 0px; border-top-left-radius: {self.tab_radius}px; border-top-right-radius: {self.tab_radius}px;")
                 else:
-                    button.setStyleSheet(f"background-color: {black}; color: white; border: none; padding: 5px 10px; margin: 0px; border-top-left-radius: 5px; border-top-right-radius: 5px;")
+                    button.setStyleSheet(f"background-color: {self.tab_bar_bg}; color: {self.tab_text_color}; border: none; padding: {self.tab_padding}; margin: 0px; border-top-left-radius: {self.tab_radius}px; border-top-right-radius: {self.tab_radius}px;")
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasText() and event.mimeData().text() == "panel":
@@ -802,7 +834,7 @@ class Dock(QFrame):
                 window = source_dock.panels[window_index]
                 window_name = window.__class__.__name__
 
-                from UI.dock import ExternalDock
+                from tabdock.dock import ExternalDock
                 external_dock = ExternalDock(window_name)
 
                 # Remove from source
@@ -925,7 +957,7 @@ class Dock(QFrame):
 
         self.preview_button = QPushButton(window_name)
         self.preview_button.setFlat(True)
-        self.preview_button.setStyleSheet(f"background-color: {bg}; color: white; border: none; padding: 5px 10px; margin: 0px; border-top-left-radius: 5px; border-top-right-radius: 5px; opacity: 0.7;")
+        self.preview_button.setStyleSheet(f"background-color: {self.active_tab_color}; color: {self.tab_text_color}; border: none; padding: {self.tab_padding}; margin: 0px; border-top-left-radius: {self.tab_radius}px; border-top-right-radius: {self.tab_radius}px; opacity: 0.7;")
         self.preview_button.setContentsMargins(0, 0, 0, 0)
         self.preview_button.setEnabled(False)
 
@@ -1035,7 +1067,7 @@ class Dock(QFrame):
 
         tab_button = DraggableTabButton(panel_name, self, insert_index)
         tab_button.setFlat(True)
-        tab_button.setStyleSheet(f"background-color: {black}; color: white; border: none; padding: 5px 10px; margin: 0px;")
+        tab_button.setStyleSheet(f"background-color: {self.tab_bar_bg}; color: {self.tab_text_color}; border: none; padding: {self.tab_padding}; margin: 0px;")
         tab_button.setContentsMargins(0, 0, 0, 0)
         tab_button.clicked.connect(lambda _, idx=insert_index: self.switch_tab(idx))
         self.tab_buttons.insert(insert_index, tab_button)

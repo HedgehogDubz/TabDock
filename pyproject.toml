@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "tabdock"
+version = "0.1.0"
+description = "A PyQt6 dockable layout framework for Python desktop applications"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "PyQt6",
+]
+
+[project.optional-dependencies]
+themes = [
+    "qt-themes",
+    "qtpy",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tabdock*"]

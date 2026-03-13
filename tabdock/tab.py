@@ -1,8 +1,24 @@
 from PyQt6.QtWidgets import QWidget
-from UI.dock import Dock
+from tabdock.dock import Dock
+from tabdock._style_guide import bg, black, border_color
 
 class Tab(QWidget):
-    def __init__(self, parent, name, index):
+    def __init__(self, parent, name, index, *,
+                 dock_bg=None,
+                 tab_bar_bg=None,
+                 content_bg=None,
+                 dock_border_color=None,
+                 border_width=None,
+                 tab_text_color=None,
+                 active_tab_color=None,
+                 tab_height=None,
+                 tab_radius=None,
+                 tab_padding=None,
+                 tab_spacing=None,
+                 dock_padding=None,
+                 panel_bg=None,
+                 available_panels=None,
+                 accent_color=None):
         super().__init__(parent)
         self.parent = parent
 
@@ -11,6 +27,23 @@ class Tab(QWidget):
         self.docks = []
         self.connectors = []
         self.min_dock_size = getattr(parent, 'min_dock_size', 100)
+
+        # Inherit from parent (TabDock) if not explicitly overridden
+        self.dock_bg           = dock_bg           if dock_bg           is not None else getattr(parent, 'dock_bg',           black)
+        self.tab_bar_bg        = tab_bar_bg        if tab_bar_bg        is not None else getattr(parent, 'tab_bar_bg',        black)
+        self.content_bg        = content_bg        if content_bg        is not None else getattr(parent, 'content_bg',        bg)
+        self.dock_border_color = dock_border_color if dock_border_color is not None else getattr(parent, 'dock_border_color', border_color)
+        self.border_width      = border_width      if border_width      is not None else getattr(parent, 'border_width',      2)
+        self.tab_text_color    = tab_text_color    if tab_text_color    is not None else getattr(parent, 'tab_text_color',    'white')
+        self.active_tab_color  = active_tab_color  if active_tab_color  is not None else getattr(parent, 'active_tab_color',  bg)
+        self.tab_height        = tab_height        if tab_height        is not None else getattr(parent, 'dock_tab_height',   25)
+        self.tab_radius        = tab_radius        if tab_radius        is not None else getattr(parent, 'dock_tab_radius',   5)
+        self.tab_padding       = tab_padding       if tab_padding       is not None else getattr(parent, 'dock_tab_padding',  '5px 10px')
+        self.tab_spacing       = tab_spacing       if tab_spacing       is not None else getattr(parent, 'dock_tab_spacing',  0)
+        self.dock_padding      = dock_padding      if dock_padding      is not None else getattr(parent, 'dock_padding',      2)
+        self.panel_bg          = panel_bg          if panel_bg          is not None else getattr(parent, 'panel_bg',          bg)
+        self.available_panels  = available_panels  if available_panels  is not None else getattr(parent, 'available_panels',  [])
+        self.accent_color      = accent_color      if accent_color      is not None else getattr(parent, 'accent_color',      '#5080c0')
 
         self.initUI()
 
@@ -53,8 +86,8 @@ class Tab(QWidget):
         if dock not in self.docks:
             return
 
-        from UI.hconnector import HConnector
-        from UI.vconnector import VConnector
+        from tabdock.hconnector import HConnector
+        from tabdock.vconnector import VConnector
 
         EPS = 1e-6
 

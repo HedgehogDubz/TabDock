@@ -1,5 +1,5 @@
 from PyQt6.QtCore import Qt, QObject, QEvent
-from UI.tab import Tab
+from tabdock.tab import Tab
 
 
 class ConnectorManager(QObject):
