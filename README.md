@@ -219,7 +219,7 @@ Widget factory methods:
 
 # Shared State Between Panel Instances
 
-Every subclass of Panel has a shared state manager. All instances of the same panel class read and write from the same state, so changes in one dock are automatically reflected in any other dock showing the same panel type.
+Every subclass of Panel has a shared state manager. All instances of the same panel class read and write from the same state, so changes in one dock are automatically reflected in any other dock showing the same panel type. (Note: you can use these functions without using a global key; doing so will make each instance of each panel different, and you will have to get values from the widget the classical way from PyQt).
 
 To use this, pass a key name to the widget factory's state parameter:
 
@@ -246,20 +246,26 @@ def initUI(self):
     # This list syncs its selection to "files"
     self.add_list(["a.py", "b.py"], list_key="files", default=[])
 ```
+Unilateral can change based on the key, but has no way of changing the key itself
+Bilateral can change based on the key, and changes the key based on user input
+Buttons are neither, as they do not require any key, nor will they automatically change a key
 
+Note that multiple different widgets can have the same key if compatible 
+i.e., a label and a text_input can have the same key and the label will update based on the text_input
 State key parameters by widget:
 
-| Widget | Key parameter | Value type |
+| Widget | Key parameter | Value type | Unilateral // Bilateral
 |---|---|---|
-| `add_label` | `state_key` | any (use `state_format` to convert) |
-| `add_button` | `bool_key` | `bool` |
-| `add_checkbox` | `bool_key` | `bool` |
-| `add_text_input` | `string_key` | `str` |
-| `add_dropdown` | `string_key` | `str` (selected text) |
-| `add_slider` | `int_key` | `int` |
-| `add_progress_bar` | `int_key` | `int` |
-| `add_list` | `list_key` | `list[str]` |
-| `add_calendar` | `string_key` | `str` ("YYYY-MM-DD") |
+| `add_label` | `state_key` | any (use `state_format` to convert) | Unilateral
+| `add_button` | `NONE` | NONE | NONE
+| `add_toggle_button` | `bool_key` | `bool` | Bilateral
+| `add_checkbox` | `bool_key` | `bool` | Bilateral
+| `add_text_input` | `string_key` | `str` | Bilateral
+| `add_dropdown` | `string_key` | `str` (selected text) | Bilateral
+| `add_slider` | `int_key` | `int` | Bilateral
+| `add_progress_bar` | `int_key` | `int` | Unilateral
+| `add_list` | `list_key` | `list[str]` | Bilateral
+| `add_calendar` | `string_key` | `str` ("YYYY-MM-DD") | Bilateral
 
 The `default` parameter sets the initial value only if the key has never been set. The first instance to initialize wins; subsequent instances pick up the current value.
 
