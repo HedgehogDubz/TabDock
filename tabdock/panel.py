@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QVBoxLayout,
                               QCheckBox, QSlider, QListWidget, QAbstractItemView,
                               QProgressBar, QCalendarWidget)
 from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtGui import QIntValidator, QDoubleValidator
 from tabdock._style_guide import bg, black
 from tabdock.panel_state import PanelStateManager
 
@@ -123,19 +124,8 @@ class Panel(QFrame):
         self._current_row.addWidget(w)
         return w
 
-    def add_button(self, text: str, callback=None,
-                   bool_key: str = None, default: bool = False,
-                   on_text: str = None, off_text: str = None) -> QPushButton:
-        """Styled push button.
-
-        Args:
-            bool_key: Clicking toggles a bool in shared state under this key.
-                      on_text / off_text optionally relabel the button on each state.
-            default:  Initial bool value if the key is new (default False).
-            callback: Called on click, or with the new bool when bool_key is set.
-        """
-        w = QPushButton(text, self)
-        w.setStyleSheet(f"""
+    def _button_stylesheet(self) -> str:
+        return f"""
             QPushButton {{
                 background-color: {self.widget_bg};
                 color: {self.text_color};
@@ -151,24 +141,45 @@ class Panel(QFrame):
                 background-color: {self.panel_bg};
                 border: 1px solid {self.accent_color};
             }}
-        """)
-        if bool_key is not None:
-            self._init_key(bool_key, default)
+        """
 
-            def _on_click():
-                new_val = not self.state.get(bool_key, default)
-                self.state.set(bool_key, new_val)
-                if callback:
-                    callback(new_val)
-            w.clicked.connect(_on_click)
+    def add_button(self, text: str, callback=None) -> QPushButton:
+        """Styled push button."""
+        w = QPushButton(text, self)
+        w.setStyleSheet(self._button_stylesheet())
+        if callback:
+            w.clicked.connect(callback)
+        self._current_row.addWidget(w)
+        return w
 
-            if on_text is not None or off_text is not None:
-                _on  = on_text  or text
-                _off = off_text or text
-                self._subscribe(bool_key, lambda v: w.setText(_on if v else _off))
-        else:
+    def add_toggle_button(self, text: str, bool_key: str,
+                          default: bool = False,
+                          on_text: str = None, off_text: str = None,
+                          callback=None) -> QPushButton:
+        """Styled push button that toggles a shared bool state on each click.
+
+        Args:
+            bool_key: State key for the boolean value.
+            default:  Initial value if the key is new (default False).
+            on_text:  Button label when state is True. Defaults to text.
+            off_text: Button label when state is False. Defaults to text.
+            callback: Called with the new bool value after each toggle.
+        """
+        w = QPushButton(text, self)
+        w.setStyleSheet(self._button_stylesheet())
+        self._init_key(bool_key, default)
+
+        def _on_click():
+            new_val = not self.state.get(bool_key, default)
+            self.state.set(bool_key, new_val)
             if callback:
-                w.clicked.connect(callback)
+                callback(new_val)
+        w.clicked.connect(_on_click)
+
+        if on_text is not None or off_text is not None:
+            _on  = on_text  or text
+            _off = off_text or text
+            self._subscribe(bool_key, lambda v: w.setText(_on if v else _off))
         self._current_row.addWidget(w)
         return w
 
@@ -271,6 +282,94 @@ class Panel(QFrame):
         else:
             if callback:
                 w.textChanged.connect(callback)
+        self._current_row.addWidget(w)
+        return w
+
+    def add_number_input(self, placeholder: str = "",
+                         integers_only: bool = False,
+                         positive_only: bool = False,
+                         min_value: float = None,
+                         max_value: float = None,
+                         float_key: str = None,
+                         default: float = None,
+                         callback=None) -> QLineEdit:
+        """Single-line number input with validation.
+
+        Args:
+            integers_only: Only accept whole numbers.
+            positive_only: Only accept values >= 0.
+            min_value:     Minimum allowed value (overrides positive_only floor if set).
+            max_value:     Maximum allowed value.
+            float_key:     Syncs the numeric value with shared state.
+            default:       Initial value if the key is new (defaults to 0).
+            callback:      Called with the parsed numeric value on valid change.
+        """
+        w = QLineEdit(self)
+        w.setPlaceholderText(placeholder)
+        w.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {self.widget_bg};
+                color: {self.text_color};
+                border: 1px solid transparent;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 12px;
+            }}
+            QLineEdit:focus {{
+                border: 1px solid {self.accent_color};
+            }}
+        """)
+
+        if integers_only:
+            lo = int(min_value) if min_value is not None else (0 if positive_only else -2147483647)
+            hi = int(max_value) if max_value is not None else 2147483647
+            if positive_only:
+                lo = max(0, lo)
+            w.setValidator(QIntValidator(lo, hi, w))
+        else:
+            lo = float(min_value) if min_value is not None else (0.0 if positive_only else -1e18)
+            hi = float(max_value) if max_value is not None else 1e18
+            if positive_only:
+                lo = max(0.0, lo)
+            val = QDoubleValidator(lo, hi, 10, w)
+            val.setNotation(QDoubleValidator.Notation.StandardNotation)
+            w.setValidator(val)
+
+        def _parse(text):
+            try:
+                return int(text) if integers_only else float(text)
+            except (ValueError, TypeError):
+                return None
+
+        if float_key is not None:
+            init_val = default if default is not None else (0 if integers_only else 0.0)
+            self._init_key(float_key, init_val)
+            current = self.state.get(float_key)
+            if current is not None:
+                w.setText(str(int(current)) if integers_only else str(current))
+            _syncing = [False]
+
+            def _on_user_change(text):
+                if not _syncing[0]:
+                    v = _parse(text)
+                    if v is not None:
+                        self.state.set(float_key, v)
+                        if callback:
+                            callback(v)
+            w.textChanged.connect(_on_user_change)
+
+            def _sync(v):
+                _syncing[0] = True
+                w.setText(str(int(v)) if integers_only else str(v))
+                _syncing[0] = False
+            self._subscribe(float_key, _sync)
+        else:
+            if callback:
+                def _on_change(text):
+                    v = _parse(text)
+                    if v is not None:
+                        callback(v)
+                w.textChanged.connect(_on_change)
         self._current_row.addWidget(w)
         return w
 

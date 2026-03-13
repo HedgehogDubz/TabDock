@@ -206,6 +206,7 @@ Widget factory methods:
 | `add_button(text, callback)` | Push button |
 | `add_dropdown(options, callback)` | Combo box |
 | `add_text_input(placeholder, callback)` | Single-line text field |
+| `add_number_input(placeholder, integers_only, positive_only, min_value, max_value, callback)` | Number-only text field |
 | `add_checkbox(text, callback)` | Checkbox |
 | `add_slider(minimum, maximum, value, callback)` | Horizontal slider |
 | `add_progress_bar(minimum, maximum, value)` | Progress bar |
@@ -261,6 +262,7 @@ State key parameters by widget:
 | `add_toggle_button` | `bool_key` | `bool` | Bilateral
 | `add_checkbox` | `bool_key` | `bool` | Bilateral
 | `add_text_input` | `string_key` | `str` | Bilateral
+| `add_number_input` | `float_key` | `int` or `float` | Bilateral
 | `add_dropdown` | `string_key` | `str` (selected text) | Bilateral
 | `add_slider` | `int_key` | `int` | Bilateral
 | `add_progress_bar` | `int_key` | `int` | Unilateral
