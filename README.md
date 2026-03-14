@@ -256,7 +256,7 @@ i.e., a label and a text_input can have the same key and the label will update b
 State key parameters by widget:
 
 | Widget | Key parameter | Value type | Unilateral // Bilateral
-|---|---|---|
+|---|---|---|---|
 | `add_label` | `state_key` | any (use `state_format` to convert) | Unilateral
 | `add_button` | `NONE` | NONE | NONE
 | `add_toggle_button` | `bool_key` | `bool` | Bilateral
