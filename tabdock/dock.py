@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QLabel, QApplication, QMenu, QScrollArea
 from PyQt6.QtGui import QPainter, QColor, QCursor, QAction
 from PyQt6.QtCore import Qt, QPoint
-from tabdock._style_guide import bg, black, border_color
+from tabdock._style_guide import bg, black, border_color, lighten
 import math
 
 class DragPreviewWidget(QWidget):
@@ -373,6 +373,8 @@ class Dock(QFrame):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        _scroll_handle = lighten(self.content_bg, 0.25)
+        _scroll_arrow = lighten(self.content_bg, 0.35)
         self.scroll_area.setStyleSheet(f"""
             QScrollArea {{
                 background-color: {self.content_bg};
@@ -380,16 +382,51 @@ class Dock(QFrame):
             }}
             QScrollBar:vertical {{
                 background: {self.content_bg};
-                width: 8px;
-                border-radius: 4px;
+                width: 10px;
+                border-radius: 5px;
+                margin: 12px 0px;
             }}
             QScrollBar::handle:vertical {{
-                background: {self.tab_bar_bg};
-                border-radius: 4px;
+                background: {_scroll_handle};
+                border-radius: 5px;
                 min-height: 20px;
             }}
+            QScrollBar::handle:vertical:hover {{
+                background: {_scroll_arrow};
+            }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                height: 0px;
+                height: 10px;
+                subcontrol-origin: margin;
+                background: {_scroll_handle};
+                border-radius: 5px;
+            }}
+            QScrollBar::add-line:vertical:hover, QScrollBar::sub-line:vertical:hover {{
+                background: {_scroll_arrow};
+            }}
+            QScrollBar::sub-line:vertical {{
+                subcontrol-position: top;
+            }}
+            QScrollBar::add-line:vertical {{
+                subcontrol-position: bottom;
+            }}
+            QScrollBar::up-arrow:vertical {{
+                width: 6px;
+                height: 6px;
+                background: none;
+                border-left: 2px solid {self.content_bg};
+                border-top: 2px solid {self.content_bg};
+                transform: rotate(45deg);
+            }}
+            QScrollBar::down-arrow:vertical {{
+                width: 6px;
+                height: 6px;
+                background: none;
+                border-left: 2px solid {self.content_bg};
+                border-top: 2px solid {self.content_bg};
+                transform: rotate(45deg);
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: none;
             }}
         """)
 

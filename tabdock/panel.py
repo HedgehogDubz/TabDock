@@ -3,8 +3,8 @@ from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QVBoxLayout,
                               QCheckBox, QSlider, QListWidget, QAbstractItemView,
                               QProgressBar, QCalendarWidget)
 from PyQt6.QtCore import Qt, QDate
-from PyQt6.QtGui import QIntValidator, QDoubleValidator
-from tabdock._style_guide import bg, black
+from PyQt6.QtGui import QIntValidator, QDoubleValidator, QTextCharFormat, QColor
+from tabdock._style_guide import bg, black, lighten
 from tabdock.panel_state import PanelStateManager
 
 
@@ -184,17 +184,47 @@ class Panel(QFrame):
         return w
 
     def add_dropdown(self, options: list, callback=None,
-                     string_key: str = None, default: str = None) -> QComboBox:
+                     string_key: str = None, default: str = None,
+                     show_arrow: bool = True) -> QComboBox:
         """Styled combo box / dropdown.
 
         Args:
             string_key: Syncs the selected text with shared state.
             default:    Initial selected text if the key is new.
                         Falls back to the first option if not given.
+            show_arrow: Show a down/up arrow indicator (default True).
         """
         w = QComboBox(self)
         w.addItems([str(o) for o in options])
         w.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        _arrow_color = lighten(self.widget_bg, 0.45)
+        if show_arrow:
+            arrow_css = f"""
+                QComboBox::down-arrow {{
+                    border-left: 4px solid transparent;
+                    border-right: 4px solid transparent;
+                    border-top: 5px solid {_arrow_color};
+                    border-bottom: none;
+                    width: 0px;
+                    height: 0px;
+                }}
+                QComboBox::down-arrow:on {{
+                    border-left: 4px solid transparent;
+                    border-right: 4px solid transparent;
+                    border-bottom: 5px solid {_arrow_color};
+                    border-top: none;
+                    width: 0px;
+                    height: 0px;
+                }}
+            """
+        else:
+            arrow_css = f"""
+                QComboBox::down-arrow {{
+                    image: none;
+                    width: 0px;
+                    height: 0px;
+                }}
+            """
         w.setStyleSheet(f"""
             QComboBox {{
                 background-color: {self.widget_bg};
@@ -202,6 +232,7 @@ class Panel(QFrame):
                 border: 1px solid transparent;
                 border-radius: 4px;
                 padding: 4px 8px;
+                padding-right: {'22px' if show_arrow else '8px'};
                 font-size: 12px;
             }}
             QComboBox:hover {{
@@ -209,8 +240,9 @@ class Panel(QFrame):
             }}
             QComboBox::drop-down {{
                 border: none;
-                width: 18px;
+                width: {'20px' if show_arrow else '0px'};
             }}
+            {arrow_css}
             QComboBox QAbstractItemView {{
                 background-color: {self.widget_bg};
                 color: {self.text_color};
@@ -527,16 +559,35 @@ class Panel(QFrame):
             }}
             QScrollBar:vertical {{
                 background: {self.panel_bg};
-                width: 8px;
-                border-radius: 4px;
+                width: 10px;
+                border-radius: 5px;
+                margin: 12px 0px;
             }}
             QScrollBar::handle:vertical {{
-                background: {self.widget_bg};
-                border-radius: 4px;
+                background: {lighten(self.panel_bg, 0.25)};
+                border-radius: 5px;
                 min-height: 20px;
             }}
+            QScrollBar::handle:vertical:hover {{
+                background: {lighten(self.panel_bg, 0.35)};
+            }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                height: 0px;
+                height: 10px;
+                subcontrol-origin: margin;
+                background: {lighten(self.panel_bg, 0.25)};
+                border-radius: 5px;
+            }}
+            QScrollBar::add-line:vertical:hover, QScrollBar::sub-line:vertical:hover {{
+                background: {lighten(self.panel_bg, 0.35)};
+            }}
+            QScrollBar::sub-line:vertical {{
+                subcontrol-position: top;
+            }}
+            QScrollBar::add-line:vertical {{
+                subcontrol-position: bottom;
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: none;
             }}
         """)
         if list_key is not None:
@@ -630,6 +681,15 @@ class Panel(QFrame):
         w = QCalendarWidget(self)
         w.setGridVisible(False)
         w.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+
+        # Make weekend days the same color as weekdays
+        weekday_fmt = QTextCharFormat()
+        weekday_fmt.setForeground(QColor(self.text_color))
+        w.setWeekdayTextFormat(Qt.DayOfWeek.Saturday, weekday_fmt)
+        w.setWeekdayTextFormat(Qt.DayOfWeek.Sunday, weekday_fmt)
+
+        _nav_arrow_bg = lighten(self.widget_bg, 0.15)
+        _nav_arrow_hover = lighten(self.widget_bg, 0.30)
         w.setStyleSheet(f"""
             QCalendarWidget {{
                 background-color: {self.widget_bg};
@@ -673,10 +733,26 @@ class Panel(QFrame):
             QCalendarWidget QToolButton::menu-indicator {{
                 image: none;
             }}
-            QCalendarWidget QToolButton#qt_calendar_prevmonth,
-            QCalendarWidget QToolButton#qt_calendar_nextmonth {{
+            QCalendarWidget QToolButton#qt_calendar_prevmonth {{
+                qproperty-text: "<";
                 qproperty-icon: none;
+                background-color: {_nav_arrow_bg};
+                font-size: 14px;
                 font-weight: bold;
+                padding: 2px 8px;
+            }}
+            QCalendarWidget QToolButton#qt_calendar_nextmonth {{
+                qproperty-text: ">";
+                qproperty-icon: none;
+                background-color: {_nav_arrow_bg};
+                font-size: 14px;
+                font-weight: bold;
+                padding: 2px 8px;
+            }}
+            QCalendarWidget QToolButton#qt_calendar_prevmonth:hover,
+            QCalendarWidget QToolButton#qt_calendar_nextmonth:hover {{
+                background-color: {_nav_arrow_hover};
+                border: 1px solid {self.accent_color};
             }}
             QCalendarWidget QSpinBox {{
                 background-color: {self.widget_bg};
