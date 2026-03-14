@@ -194,14 +194,18 @@ class Panel(QFrame):
         """
         w = QComboBox(self)
         w.addItems([str(o) for o in options])
+        w.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         w.setStyleSheet(f"""
             QComboBox {{
                 background-color: {self.widget_bg};
                 color: {self.text_color};
-                border: none;
+                border: 1px solid transparent;
                 border-radius: 4px;
                 padding: 4px 8px;
                 font-size: 12px;
+            }}
+            QComboBox:hover {{
+                border: 1px solid {self.accent_color};
             }}
             QComboBox::drop-down {{
                 border: none;
@@ -213,6 +217,7 @@ class Panel(QFrame):
                 selection-background-color: {self.active_color};
                 border: none;
                 outline: none;
+                padding: 2px;
             }}
         """)
         if string_key is not None:
@@ -626,6 +631,11 @@ class Panel(QFrame):
         w.setGridVisible(False)
         w.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
         w.setStyleSheet(f"""
+            QCalendarWidget {{
+                background-color: {self.widget_bg};
+                border: none;
+                border-radius: 4px;
+            }}
             QCalendarWidget QAbstractItemView {{
                 background-color: {self.widget_bg};
                 color: {self.text_color};
@@ -633,39 +643,69 @@ class Panel(QFrame):
                 selection-color: {self.panel_bg};
                 border: none;
                 outline: none;
+                font-size: 12px;
+                alternate-background-color: {self.widget_bg};
             }}
             QCalendarWidget QAbstractItemView:disabled {{
-                color: {self.widget_bg};
+                color: {self.panel_bg};
+            }}
+            QCalendarWidget QWidget {{
+                alternate-background-color: {self.widget_bg};
             }}
             QCalendarWidget QWidget#qt_calendar_navigationbar {{
-                background-color: {self.widget_bg};
+                background-color: {self.panel_bg};
+                border: none;
                 border-radius: 4px;
-                padding: 2px;
+                padding: 4px;
             }}
             QCalendarWidget QToolButton {{
-                background-color: transparent;
+                background-color: {self.widget_bg};
                 color: {self.text_color};
-                border: none;
-                padding: 4px 8px;
+                border: 1px solid transparent;
+                border-radius: 4px;
+                padding: 4px 10px;
                 font-size: 12px;
+                font-weight: bold;
             }}
             QCalendarWidget QToolButton:hover {{
                 border: 1px solid {self.accent_color};
-                border-radius: 3px;
             }}
             QCalendarWidget QToolButton::menu-indicator {{
                 image: none;
             }}
+            QCalendarWidget QToolButton#qt_calendar_prevmonth,
+            QCalendarWidget QToolButton#qt_calendar_nextmonth {{
+                qproperty-icon: none;
+                font-weight: bold;
+            }}
             QCalendarWidget QSpinBox {{
                 background-color: {self.widget_bg};
                 color: {self.text_color};
-                border: none;
+                border: 1px solid transparent;
+                border-radius: 4px;
+                padding: 2px 6px;
                 font-size: 12px;
+                selection-background-color: {self.accent_color};
+                selection-color: {self.panel_bg};
+            }}
+            QCalendarWidget QSpinBox:focus {{
+                border: 1px solid {self.accent_color};
+            }}
+            QCalendarWidget QSpinBox::up-button,
+            QCalendarWidget QSpinBox::down-button {{
+                width: 0px;
+                border: none;
             }}
             QCalendarWidget QMenu {{
                 background-color: {self.widget_bg};
                 color: {self.text_color};
-                border: none;
+                border: 1px solid {self.panel_bg};
+                border-radius: 4px;
+                padding: 2px;
+            }}
+            QCalendarWidget QMenu::item:selected {{
+                background-color: {self.accent_color};
+                color: {self.panel_bg};
             }}
         """)
 

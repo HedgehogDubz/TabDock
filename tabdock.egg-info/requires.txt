@@ -1,0 +1,5 @@
+PyQt6
+
+[themes]
+qt-themes
+qtpy

@@ -1,0 +1,475 @@
+Metadata-Version: 2.4
+Name: tabdock
+Version: 0.1.0
+Summary: A PyQt6 dockable layout framework for Python desktop applications
+Author-email: Tristan Winata <twinata@sas.upenn.edu>
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: PyQt6
+Provides-Extra: themes
+Requires-Dist: qt-themes; extra == "themes"
+Requires-Dist: qtpy; extra == "themes"
+
+# TabDock UI Framework
+
+A PyQt6 dockable layout framework. The UI is made up of tabs, each containing resizable docks, each dock containing one or more panels inspired largely by the design of game engines, IDEs, and art programs. Users can resize docks by dragging the dividers between them, rearrange panels within docks by dragging their tab buttons, and tear panels out into floating windows. There is also a shared state mechanism that lets panels communicate with each other even when they're in different docks. This framework is meant to be an easy-to-plug-in UI layer for any Python application.
+
+Provides support for themes from:
+https://github.com/beatreichenbach/qt-themes?tab=readme-ov-file
+
+---
+
+# Installation
+
+```
+pip install tabdock
+```
+
+For theme support:
+
+```
+pip install tabdock[themes]
+```
+
+Requires Python 3.11 or later.
+
+---
+
+# Quick Start
+
+```python
+import sys
+from PyQt6.QtWidgets import QApplication, QMainWindow
+from tabdock import TabDock, Panel, apply_theme
+from tabdock.tabs import LeftMainTab
+
+class MyPanel(Panel):
+    def __init__(self, parent, docked, x, y, w, h):
+        super().__init__(parent, docked, x, y, w, h)
+        self.initUI()
+
+    def initUI(self):
+        self.add_section_label("Controls")
+        self.next_row()
+        self.add_button("Run", callback=lambda: print("run"))
+        self.add_button("Stop", callback=lambda: print("stop"))
+
+app = QApplication(sys.argv)
+theme_kwargs = apply_theme("monokai")
+
+window = QMainWindow()
+TD = TabDock(available_panels=[MyPanel], **theme_kwargs)
+window.setCentralWidget(TD)
+
+tab = LeftMainTab(TD, "Main", 0, left_panels=[MyPanel], main_panels=[MyPanel])
+TD.add_tab(tab)
+
+window.show()
+sys.exit(app.exec())
+```
+
+---
+
+# Architecture
+
+The hierarchy from outermost to innermost is:
+
+```
+TabDock  —  the main widget, sits inside QMainWindow
+  Tab    —  one screen layout, selected from the top bar
+    Dock —  a resizable container that holds panels in its own tab row
+      Panel — the actual UI content you write
+```
+
+Docks are positioned using ratios (0.0 to 1.0) relative to the Tab's size, so they resize correctly with the window. Connectors sit between adjacent docks and let the user drag to resize them.
+
+---
+
+# Core Classes
+
+
+## TabDock
+
+The root container. Pass it to `setCentralWidget`.
+
+```python
+from tabdock import TabDock
+
+TD = TabDock(
+    create_external_docks=True,   # allow panels to be torn out into floating windows
+    min_dock_size=100,            # minimum pixel size for any dock before splits are disabled
+    available_panels=[MyPanel],   # panel classes the user can add via right-click menu
+)
+```
+
+Styling parameters (all optional, all cascade down to Tab, Dock, and Panel):
+
+| Parameter | What it controls |
+|---|---|
+| `tab_height` | Height of the top-level tab chooser bar |
+| `tab_bar_bg` | Background of the tab chooser bar |
+| `content_bg` | Background of the content area |
+| `tab_text_color` | Text color on tab buttons |
+| `active_tab_color` | Highlighted tab button color |
+| `dock_bg` | Background of each dock |
+| `dock_border_color` | Color of the dock border |
+| `panel_bg` | Background of each panel |
+| `accent_color` | Accent color used on interactive widgets |
+
+Call `add_tab(tab)` to register a tab. Call `switch_tab(index)` to change the visible one.
+
+
+## Tab
+
+A Tab defines one screen layout. Subclass it and implement `initUI` to create docks and connectors.
+
+```python
+from tabdock import Tab, Dock, HConnector
+
+class MyTab(Tab):
+    def initUI(self):
+        self.left  = Dock(self, [MyPanel], 0,   0, 0.3, 1)
+        self.right = Dock(self, [MyPanel], 0.3, 0, 0.7, 1)
+
+        self.add_dock(self.left)
+        self.add_dock(self.right)
+
+        self.add_connector(HConnector(self, 0.3, [self.left], [self.right]))
+
+        self.left.raise_()
+        self.right.raise_()
+```
+
+The four positional arguments to `Dock` are `x_ratio`, `y_ratio`, `w_ratio`, `h_ratio`. All are fractions of the Tab's width and height (0.0 to 1.0).
+
+Always call `dock.raise_()` on every dock after adding connectors — this keeps dock tab bars clickable above the connector hit zones.
+
+The constructor signature for a Tab is `(parent, name, index, **style_kwargs)`. Store any custom arguments as instance variables before calling `super().__init__()` because `super().__init__()` calls `initUI()`.
+
+
+## Dock
+
+A Dock holds one or more panels and displays them in its own small tab row at the top. The user can right-click a dock to split it, add panels, or delete it.
+
+```python
+Dock(parent, panels, x_ratio, y_ratio, w_ratio, h_ratio)
+```
+
+- `panels` is a list of Panel classes (not instances). The dock instantiates them itself.
+- The dock's tab bar shows one button per panel. Dragging a button reorders it or tears it into a new floating window.
+
+You do not usually call methods on Dock directly from application code. Layout is handled by the Tab, and user interactions are handled internally.
+
+
+## HConnector and VConnector
+
+Connectors are the draggable dividers between docks.
+
+- `HConnector` is a vertical line the user drags left/right.
+- `VConnector` is a horizontal line the user drags up/down.
+
+```python
+from tabdock import HConnector, VConnector
+
+HConnector(parent_tab, x_ratio, left_docks, right_docks)
+VConnector(parent_tab, y_ratio, top_docks,  bottom_docks)
+```
+
+Pass every dock that shares that edge on each side. When the user drags the connector, all listed docks on both sides resize together.
+
+
+## Panel
+
+A Panel is the leaf of the hierarchy — it contains your actual UI. Subclass it and implement `initUI`.
+
+```python
+from tabdock import Panel
+
+class MyPanel(Panel):
+    def __init__(self, parent, docked, x, y, w, h):
+        super().__init__(parent, docked, x, y, w, h)
+        self.initUI()
+
+    def initUI(self):
+        self.add_section_label("Controls")
+        self.next_row()
+        self.add_button("Run", callback=self.on_run)
+        self.add_button("Stop", callback=self.on_stop)
+        self.next_row()
+        self.add_slider(minimum=0, maximum=100, value=50)
+
+    def on_run(self):
+        print("running")
+
+    def on_stop(self):
+        print("stopped")
+```
+
+Widgets are placed left to right in the current row. Call `next_row()` to move to the next line. All widgets inherit the panel's theme colors automatically.
+
+Always store custom constructor arguments before calling `super().__init__()` because `super().__init__()` calls `initUI()`.
+
+Widget factory methods:
+
+| Method | What it creates |
+|---|---|
+| `add_label(text)` | Plain text label |
+| `add_section_label(text)` | Bold section header |
+| `add_button(text, callback)` | Push button |
+| `add_dropdown(options, callback)` | Combo box |
+| `add_text_input(placeholder, callback)` | Single-line text field |
+| `add_number_input(placeholder, integers_only, positive_only, min_value, max_value, callback)` | Number-only text field |
+| `add_checkbox(text, callback)` | Checkbox |
+| `add_slider(minimum, maximum, value, callback)` | Horizontal slider |
+| `add_progress_bar(minimum, maximum, value)` | Progress bar |
+| `add_list(items, multi_select, callback)` | Scrollable list |
+| `add_calendar(callback)` | Monthly calendar picker |
+| `add_separator()` | Full-width horizontal divider line |
+| `add_spacer(height)` | Vertical blank space |
+| `next_row()` | Start a new row |
+
+---
+
+# Shared State Between Panel Instances
+
+Every subclass of Panel has a shared state manager. All instances of the same panel class read and write from the same state, so changes in one dock are automatically reflected in any other dock showing the same panel type. (Note: you can use these functions without using a global key; doing so will make each instance of each panel different, and you will have to get values from the widget the classical way from PyQt).
+
+To use this, pass a key name to the widget factory's state parameter:
+
+```python
+def initUI(self):
+    # This label will display the current value of "mode" in shared state
+    self.add_label("Mode: none", state_key="mode", state_format=lambda v: f"Mode: {v}")
+    self.next_row()
+
+    # Clicking this button toggles a boolean stored at "active"
+    # The button label changes to reflect the current state
+    self.add_button("Enable", bool_key="active", default=False,
+                    on_text="Enabled", off_text="Enable")
+    self.next_row()
+
+    # This checkbox stays in sync with the same "active" key
+    self.add_checkbox("Active", bool_key="active")
+    self.next_row()
+
+    # This dropdown syncs its selected text to "mode"
+    self.add_dropdown(["Fast", "Slow", "Paused"], string_key="mode", default="Fast")
+    self.next_row()
+
+    # This list syncs its selection to "files"
+    self.add_list(["a.py", "b.py"], list_key="files", default=[])
+```
+Unilateral can change based on the key, but has no way of changing the key itself
+Bilateral can change based on the key, and changes the key based on user input
+Buttons are neither, as they do not require any key, nor will they automatically change a key
+
+Note that multiple different widgets can have the same key if compatible 
+i.e., a label and a text_input can have the same key and the label will update based on the text_input
+State key parameters by widget:
+
+| Widget | Key parameter | Value type | Unilateral // Bilateral
+|---|---|---|
+| `add_label` | `state_key` | any (use `state_format` to convert) | Unilateral
+| `add_button` | `NONE` | NONE | NONE
+| `add_toggle_button` | `bool_key` | `bool` | Bilateral
+| `add_checkbox` | `bool_key` | `bool` | Bilateral
+| `add_text_input` | `string_key` | `str` | Bilateral
+| `add_number_input` | `float_key` | `int` or `float` | Bilateral
+| `add_dropdown` | `string_key` | `str` (selected text) | Bilateral
+| `add_slider` | `int_key` | `int` | Bilateral
+| `add_progress_bar` | `int_key` | `int` | Unilateral
+| `add_list` | `list_key` | `list[str]` | Bilateral
+| `add_calendar` | `string_key` | `str` ("YYYY-MM-DD") | Bilateral
+
+The `default` parameter sets the initial value only if the key has never been set. The first instance to initialize wins; subsequent instances pick up the current value.
+
+You can also read and write state directly:
+
+```python
+self.state.get("active")          # read a value
+self.state.set("active", True)    # write a value (notifies all subscribers)
+self.state.has("active")          # check if a key exists
+```
+
+---
+
+# Built-in Tab Layouts
+
+These are ready-made Tab subclasses. Import them from `tabdock.tabs`.
+
+```python
+from tabdock.tabs import StandardTab, LeftMainTab, TopBottomTab, EditorTab, QuadTab
+```
+
+
+## StandardTab
+
+Classic sidebar layout.
+
+```
++--------+-----------+--------+
+|        |           |        |
+|  left  |  center   | right  |
+|        |           |        |
+|        +-----------+        |
+|        |  bottom   |        |
++--------+-----------+--------+
+```
+
+```python
+StandardTab(TD, "My Tab", 0,
+    left_panels=[FilePanel],
+    center_panels=[EditorPanel],
+    right_panels=[InspectorPanel],
+    bottom_panels=[LogPanel],
+    left_ratio=0.20, right_ratio=0.20, bottom_ratio=0.30)
+```
+
+Docks accessible as `tab.left`, `tab.center`, `tab.right`, `tab.bottom`.
+
+
+## LeftMainTab
+
+Left sidebar with a single large main area.
+
+```
++--------+--------------------+
+|        |                    |
+|  left  |       main         |
+|        |                    |
++--------+--------------------+
+```
+
+```python
+LeftMainTab(TD, "My Tab", 0,
+    left_panels=[TreePanel],
+    main_panels=[ContentPanel],
+    left_ratio=0.25)
+```
+
+Docks accessible as `tab.left`, `tab.main`.
+
+
+## TopBottomTab
+
+Toolbar strip on top, large main area below.
+
+```
++----------------------------+
+|            top             |
++----------------------------+
+|            main            |
++----------------------------+
+```
+
+```python
+TopBottomTab(TD, "My Tab", 0,
+    top_panels=[ToolbarPanel],
+    main_panels=[ViewPanel],
+    top_ratio=0.10)
+```
+
+Docks accessible as `tab.top`, `tab.main`.
+
+
+## EditorTab
+
+IDE-style: file tree on the left, editor in the center, console at the bottom.
+
+```
++--------+--------------------+
+|        |       main         |
+|  left  +--------------------+
+|        |      bottom        |
++--------+--------------------+
+```
+
+```python
+EditorTab(TD, "My Tab", 0,
+    left_panels=[FilesPanel],
+    main_panels=[EditorPanel],
+    bottom_panels=[ConsolePanel],
+    left_ratio=0.20, bottom_ratio=0.25)
+```
+
+Docks accessible as `tab.left`, `tab.main`, `tab.bottom`.
+
+
+## QuadTab
+
+Four equal quadrants.
+
+```
++-------------+-------------+
+|             |             |
+|  top_left   |  top_right  |
+|             |             |
++-------------+-------------+
+|             |             |
+| bottom_left | bottom_right|
+|             |             |
++-------------+-------------+
+```
+
+```python
+QuadTab(TD, "My Tab", 0,
+    top_left_panels=[ChartPanel],
+    top_right_panels=[ChartPanel],
+    bottom_left_panels=[ChartPanel],
+    bottom_right_panels=[StatsPanel],
+    h_split=0.5, v_split=0.5)
+```
+
+Docks accessible as `tab.top_left`, `tab.top_right`, `tab.bottom_left`, `tab.bottom_right`.
+
+---
+
+# Theming
+
+Themes are applied through `qt-themes` using the `apply_theme` helper (requires `pip install tabdock[themes]`):
+
+```python
+from tabdock import apply_theme
+
+theme_kwargs = apply_theme("monokai")
+TD = TabDock(..., **theme_kwargs)
+```
+
+The helper sets the global QPalette and returns a dict of color keyword arguments that flow through the cascade into every Dock and Panel. If `qt-themes` is not installed it returns an empty dict silently, so the app still runs with default colors.
+
+To see available themes:
+
+```python
+from tabdock import get_available_themes
+print(get_available_themes())
+```
+
+---
+
+# File Structure
+
+```
+pyproject.toml
+
+tabdock/
+  __init__.py                  public API exports
+  TabDock.py                   top-level container widget
+  tab.py                       Tab base class
+  dock.py                      Dock widget and drag logic
+  panel.py                     Panel base class and widget factories
+  panel_state.py               shared observable state per panel class
+  hconnector.py                horizontal (left/right) resizer
+  vconnector.py                vertical (top/bottom) resizer
+  connector_manager.py         mouse event handler for connectors
+  qt_themes_compat.py          qt-themes integration
+  _style_guide.py              default color constants
+
+  tabs/
+    __init__.py
+    standard_tab.py            four-area layout
+    left_main_tab.py           sidebar + main
+    top_bottom_tab.py          toolbar + main
+    editor_tab.py              IDE-style three-area layout
+    quad_tab.py                2x2 grid
+```
