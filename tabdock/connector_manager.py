@@ -91,61 +91,51 @@ class ConnectorManager(QObject):
                 pass  # widget was deleted
         self._cursor_widgets.clear()
 
-    def eventFilter(self, obj, event):
-        """Filter events on the parent widget to handle connector interactions."""
+    def _get_pos(self, obj, event):
+        """Extract position in parent_widget coordinates from a mouse event."""
+        if not hasattr(event, "pos"):
+            return None
+        if obj == self.parent_widget:
+            return event.pos()
+        return obj.mapTo(self.parent_widget, event.pos())
 
-        # Process mouse events
-        event_type = event.type()
-
-        if event_type not in [
-            QEvent.Type.MouseMove,
-            QEvent.Type.MouseButtonPress,
-            QEvent.Type.MouseButtonRelease,
-            QEvent.Type.Leave,
-            QEvent.Type.Enter,
-        ]:
-            return False
-
-        # Create a unique identifier for this event to avoid processing it
-        # multiple times as it bubbles up through the widget hierarchy
-        if hasattr(event, "pos"):
-            event_id = (
-                event_type,
-                event.pos().x(),
-                event.pos().y(),
-                event.timestamp() if hasattr(event, "timestamp") else 0,
-            )
-
-            if self.last_processed_event == event_id:
-                return False
-
-            self.last_processed_event = event_id
-
-        # Convert position to parent widget coordinates 
-        if hasattr(event, "pos"):
-            if obj == self.parent_widget:
-                pos = event.pos()
-            else:
-                # Map from child widget to parent widget coordinates
-                pos = obj.mapTo(self.parent_widget, event.pos())
-        else:
-            return False
-
-        # Determine which Tab this event originated from (if any) so that
-        # we only interact with connectors/docks belonging to that Tab.
-        current_tab = None
+    def _get_current_tab(self, obj):
+        """Walk up from obj to find the Tab ancestor, if any."""
         widget = obj
         while widget is not None:
             if isinstance(widget, Tab):
-                current_tab = widget
-                break
+                return widget
             widget = widget.parentWidget()
+        return None
+
+    def eventFilter(self, obj, event):
+        """Filter events on the parent widget to handle connector interactions."""
+
+        event_type = event.type()
+
+        # Handle Leave early — it has no position data
+        if event_type == QEvent.Type.Leave:
+            if not self.active_connector:
+                self._unset_cursor()
+            return False
+
+        if event_type not in (
+            QEvent.Type.MouseMove,
+            QEvent.Type.MouseButtonPress,
+            QEvent.Type.MouseButtonRelease,
+        ):
+            return False
+
+        pos = self._get_pos(obj, event)
+        if pos is None:
+            return False
+
+        current_tab = self._get_current_tab(obj)
 
         # Handle mouse press
-        if event.type() == QEvent.Type.MouseButtonPress:
+        if event_type == QEvent.Type.MouseButtonPress:
             if event.button() == Qt.MouseButton.LeftButton:
                 closest = self._find_closest_connector(pos, current_tab)
-
                 if closest:
                     self.active_connector = closest
                     self.active_connector.start_drag(pos)
@@ -155,7 +145,7 @@ class ConnectorManager(QObject):
                     return True
 
         # Handle mouse move
-        elif event.type() == QEvent.Type.MouseMove:
+        elif event_type == QEvent.Type.MouseMove:
             active = self.active_connector
             if active:
                 active.update_drag(pos)
@@ -168,13 +158,8 @@ class ConnectorManager(QObject):
                 else:
                     self._unset_cursor()
 
-        # Handle mouse leave
-        elif event.type() == QEvent.Type.Leave:
-            if not self.active_connector:
-                self._unset_cursor()
-
         # Handle mouse release
-        elif event.type() == QEvent.Type.MouseButtonRelease:
+        elif event_type == QEvent.Type.MouseButtonRelease:
             if event.button() == Qt.MouseButton.LeftButton and self.active_connector:
                 self.active_connector.end_drag(pos)
 
@@ -187,5 +172,4 @@ class ConnectorManager(QObject):
                 self.active_connector = None
                 return True
 
-        # Let the event pass through
         return False
