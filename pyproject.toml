@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tabdock"
-version = "0.1.6"
+version = "0.1.7"
 description = "A PyQt6 dockable layout framework for Python desktop applications"
 authors = [
     { name = "Tristan Winata", email = "twinata@sas.upenn.edu" }
